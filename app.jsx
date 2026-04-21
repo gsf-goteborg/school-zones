@@ -1,6 +1,6 @@
 // Main app — improved layout
 
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 const TWEAKS = /*EDITMODE-BEGIN*/{
   "showMiniMap": true,
@@ -95,6 +95,10 @@ const appStyles = {
     flex: 1,
     minHeight: 0,
   },
+  mainMobile: {
+    display:'flex', flexDirection:'column',
+    flex: 1, minHeight: 0, position:'relative',
+  },
   mapSlot: {
     position:'relative', display:'flex', minHeight:0, flex: 1,
   },
@@ -142,9 +146,10 @@ function App() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-  const isNarrow   = vp.w < 960;   // stack main area
+  const isNarrow   = vp.w < 960;   // stack main area (tablets/small laptops)
   const isCompact  = vp.w < 1200;  // hide non-essential chrome
-  const isVeryNarrow = vp.w < 640;
+  const isVeryNarrow = vp.w < 640; // single-column mobile-ish
+  const isMobile   = vp.w < 560;   // true phone layout (bottom sheet, etc.)
 
   useEffect(() => {
     if (selected) localStorage.setItem('selectedZone', selected);
@@ -222,7 +227,7 @@ function App() {
       </div>
 
       {/* ---------- Main: map + side panel ---------- */}
-      <div style={isNarrow ? appStyles.mainStacked : appStyles.main}>
+      <div style={isMobile ? appStyles.mainMobile : (isNarrow ? appStyles.mainStacked : appStyles.main)}>
         <div style={appStyles.mapSlot}>
           <ZoneMap
             selected={selected}
@@ -235,17 +240,21 @@ function App() {
             toggleZone={toggleZone}
             activeSchool={activeSchool}
             onSchoolClick={setActiveSchool}
+            isMobile={isMobile}
           />
-          <SchoolCard school={activeSchool} onClose={()=>setActiveSchool(null)}/>
+          <SchoolCard school={activeSchool} onClose={()=>setActiveSchool(null)} isMobile={isMobile}/>
         </div>
-        <SidePanel
-          zone={selected}
-          typeFilter={typeFilter}
-          onClear={()=>setSelected(null)}
-        />
+        {isMobile ? (
+          <MobileSheet open={!!selected} onClose={()=>setSelected(null)} zone={selected}>
+            <SidePanel zone={selected} typeFilter={typeFilter} onClear={()=>setSelected(null)}/>
+          </MobileSheet>
+        ) : (
+          <SidePanel zone={selected} typeFilter={typeFilter} onClear={()=>setSelected(null)}/>
+        )}
       </div>
 
-      {/* ---------- Footer ---------- */}
+      {/* ---------- Footer (hidden on mobile for space) ---------- */}
+      {!isMobile && (
       <div style={appStyles.footer}>
         <div style={appStyles.hintPill}>
           <span style={{width:6, height:6, borderRadius:999, background:'var(--teal)'}}/>
@@ -255,6 +264,7 @@ function App() {
         </div>
         <div>{visibleSchools} skolor synliga · källa: Grundskoleförvaltningen · illustrativ data</div>
       </div>
+      )}
 
       {/* ---------- Tweaks ---------- */}
       {tweaksOpen && (
@@ -300,6 +310,53 @@ function TweakRow({ label, children }) {
       <div style={{fontSize: 12, color:'var(--slate)'}}>{label}</div>
       <div style={{minWidth: 110, display:'flex', justifyContent:'flex-end'}}>{children}</div>
     </div>
+  );
+}
+
+// ---------- Mobile bottom sheet ----------
+// Appears when a zone is selected; slides up with a drag handle.
+function MobileSheet({ open, onClose, zone, children }) {
+  const [dragOffset, setDragOffset] = useState(0);
+  const startY = useRef(null);
+  const onStart = (e) => {
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    startY.current = y;
+  };
+  const onMove = (e) => {
+    if (startY.current === null) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    const dy = Math.max(0, y - startY.current);
+    setDragOffset(dy);
+  };
+  const onEnd = () => {
+    if (dragOffset > 80) onClose();
+    setDragOffset(0);
+    startY.current = null;
+  };
+  return (
+    <>
+      {open && (
+        <div onClick={onClose}
+             style={{position:'absolute', inset:0, background:'rgba(0,0,0,0.28)', zIndex: 600, transition:'opacity 200ms', opacity: 1}}/>
+      )}
+      <div style={{
+        position:'absolute', left:0, right:0, bottom:0,
+        height:'78%', zIndex: 700,
+        background:'var(--paper)',
+        borderTopLeftRadius: 16, borderTopRightRadius: 16,
+        boxShadow:'0 -10px 32px rgba(0,0,0,0.18)',
+        transform: open ? `translateY(${dragOffset}px)` : 'translateY(100%)',
+        transition: startY.current === null ? 'transform 280ms cubic-bezier(0.25, 1, 0.3, 1)' : 'none',
+        display:'flex', flexDirection:'column', overflow:'hidden',
+      }}>
+        <div onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
+             onMouseDown={onStart} onMouseMove={startY.current!==null?onMove:undefined} onMouseUp={onEnd} onMouseLeave={startY.current!==null?onEnd:undefined}
+             style={{padding:'8px 0 4px', display:'flex', justifyContent:'center', cursor:'grab', flexShrink:0, touchAction:'none'}}>
+          <div style={{width:40, height:4, borderRadius:2, background:'var(--line-2)'}}/>
+        </div>
+        <div style={{flex:1, minHeight:0, display:'flex'}}>{children}</div>
+      </div>
+    </>
   );
 }
 

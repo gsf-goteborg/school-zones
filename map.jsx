@@ -15,10 +15,10 @@ const mapStyles = {
     borderBottom:'1px solid var(--line)',
     background:'#FBF9F3', zIndex: 2,
   },
-  zoneTab: (zone, active, dim) => ({
+  zoneTab: (zone, active, dim, isMobile) => ({
     flex: 1,
     display:'flex', flexDirection:'column', justifyContent:'center',
-    padding:'10px 14px',
+    padding: isMobile ? '7px 10px' : '10px 14px',
     cursor:'pointer', userSelect:'none',
     transition:'all 140ms ease',
     borderRight:'1px solid var(--line)',
@@ -26,6 +26,7 @@ const mapStyles = {
     background: active ? '#FFFFFF' : 'transparent',
     opacity: dim ? 0.45 : 1,
     position:'relative',
+    minHeight: isMobile ? 44 : 'auto',
   }),
   zoneTabHead: { display:'flex', alignItems:'center', gap:8, marginBottom:2 },
   zoneTabSwatch: (c) => ({ width:10, height:10, borderRadius:3, background:c, boxShadow:'inset 0 0 0 1px rgba(0,0,0,0.08)' }),
@@ -71,7 +72,7 @@ const mapStyles = {
   },
 };
 
-function ZoneMap({ selected, onSelect, typeFilter, setTypeFilter, visibleZones, toggleZone, activeSchool, onSchoolClick }) {
+function ZoneMap({ selected, onSelect, typeFilter, setTypeFilter, visibleZones, toggleZone, activeSchool, onSchoolClick, isMobile }) {
   const mapRef = useRef(null);
   const mapInst = useRef(null);
   const zonesLayer = useRef({});
@@ -310,16 +311,21 @@ function ZoneMap({ selected, onSelect, typeFilter, setTypeFilter, visibleZones, 
           const isSel = selected === z;
           return (
             <div key={z}
-                 style={mapStyles.zoneTab(zd, isSel, !on)}
+                 style={mapStyles.zoneTab(zd, isSel, !on, isMobile)}
                  onClick={()=>onSelect(z)}
                  title="Klicka för att välja område">
               <div style={mapStyles.zoneTabHead}>
                 <div style={mapStyles.zoneTabSwatch(zd.color)}/>
-                <div style={mapStyles.zoneTabName}>{zd.name}</div>
+                <div style={{...mapStyles.zoneTabName, fontSize: isMobile ? 12 : 13}}>{zd.name}</div>
               </div>
-              <div style={mapStyles.zoneTabMeta}>
-                {zd.schools} skolor · {zd.students.toLocaleString('sv-SE')} elever
-              </div>
+              {!isMobile && (
+                <div style={mapStyles.zoneTabMeta}>
+                  {zd.schools} skolor · {zd.students.toLocaleString('sv-SE')} elever
+                </div>
+              )}
+              {isMobile && (
+                <div style={mapStyles.zoneTabMeta}>{zd.schools} skolor</div>
+              )}
               <div style={mapStyles.zoneTabEye}
                    onClick={(e)=>{e.stopPropagation(); toggleZone(z);}}
                    title={on?'Dölj på kartan':'Visa på kartan'}>
@@ -334,8 +340,8 @@ function ZoneMap({ selected, onSelect, typeFilter, setTypeFilter, visibleZones, 
         <div ref={mapRef} style={{position:'absolute', inset:0}}/>
 
         {/* Top-left: school type filter (compact horizontal) */}
-        <div style={mapStyles.filterPanel}>
-          <div style={mapStyles.filterLabel}>Skoltyp</div>
+        <div style={isMobile ? {...mapStyles.filterPanel, right: 8, top: 8, padding:'6px 8px', gap: 6} : mapStyles.filterPanel}>
+          {!isMobile && <div style={mapStyles.filterLabel}>Skoltyp</div>}
           <div style={mapStyles.pills}>
             {['all','F-3','F-6','F-9','4-9'].map(t=>(
               <div key={t} style={mapStyles.pill(typeFilter===t)} onClick={()=>setTypeFilter(t)}>
@@ -353,7 +359,8 @@ function ZoneMap({ selected, onSelect, typeFilter, setTypeFilter, visibleZones, 
           </div>
         )}
 
-        {/* Bottom-right: marker size legend */}
+        {/* Bottom-right: marker size legend (hidden on mobile for space) */}
+        {!isMobile && (
         <div style={mapStyles.legendCard}>
           <div style={mapStyles.filterLabel}>Skolstorlek</div>
           <div style={{display:'flex', alignItems:'center', gap:14, marginTop:2}}>
@@ -367,6 +374,7 @@ function ZoneMap({ selected, onSelect, typeFilter, setTypeFilter, visibleZones, 
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

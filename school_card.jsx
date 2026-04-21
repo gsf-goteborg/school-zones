@@ -68,7 +68,30 @@ function MiniDonut({ segs, size=58, thickness=9 }) {
   );
 }
 
-function SchoolCard({ school, onClose }) {
+// Minimal KPI row for mobile bottom sheet
+function MobileKPIs({ detail }) {
+  const items = [
+    { label:'Klasstorlek', val: detail.classSize, unit:'el/kl' },
+    { label:'Lärartäthet', val: detail.ratio, unit:'el/lär' },
+    { label:'Nyanlända',   val: detail.newcomers, unit:'%' },
+    { label:'Nöjdhet',     val: detail.satisfaction, unit:'%' },
+  ];
+  return (
+    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
+      {items.map((k,i)=>(
+        <div key={i} style={{background:'#FBF9F3', border:'1px solid var(--line)', borderRadius:6, padding:'10px 12px'}}>
+          <div style={{fontSize:10, fontFamily:'JetBrains Mono, monospace', letterSpacing:'0.1em', color:'var(--mute)', textTransform:'uppercase'}}>{k.label}</div>
+          <div style={{display:'flex', alignItems:'baseline', gap:4, marginTop:2}}>
+            <span style={{fontSize:20, fontWeight:800, color:'var(--ink)', letterSpacing:'-0.02em', fontVariantNumeric:'tabular-nums'}}>{k.val}</span>
+            <span style={{fontSize:11, fontWeight:600, color:'var(--slate-2)'}}>{k.unit}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SchoolCard({ school, onClose, isMobile }) {
   const [anchor, setAnchor] = useState(null); // {x, y, containerW, containerH}
   const [mounted, setMounted] = useState(false);
   const detail = useSchoolDetail(school);
@@ -111,6 +134,93 @@ function SchoolCard({ school, onClose }) {
   if (!school || !anchor || !detail) return null;
 
   const zd = ZONES[school.zone];
+
+  // ----- Mobile: render as bottom sheet instead of anchored popup -----
+  if (isMobile) {
+    const trendPctM = Math.round(((detail.trend[5]-detail.trend[0])/detail.trend[0])*100);
+    return (
+      <>
+        <div onClick={onClose} style={{
+          position:'absolute', inset:0, zIndex: 600,
+          background:'rgba(0,0,0,0.38)',
+          opacity: mounted ? 1 : 0,
+          transition:'opacity 200ms ease',
+        }}/>
+        <div style={{
+          position:'absolute', left: 0, right: 0, bottom: 0, zIndex: 700,
+          background:'#FFFFFF',
+          borderTopLeftRadius: 16, borderTopRightRadius: 16,
+          boxShadow:'0 -10px 32px rgba(0,0,0,0.22)',
+          transform: mounted ? 'translateY(0)' : 'translateY(100%)',
+          transition: 'transform 320ms cubic-bezier(0.2, 1, 0.3, 1)',
+          maxHeight: '82%', display:'flex', flexDirection:'column', overflow:'hidden',
+        }}>
+          {/* drag handle */}
+          <div onClick={onClose} style={{padding:'8px 0 2px', display:'flex', justifyContent:'center', cursor:'pointer', flexShrink:0}}>
+            <div style={{width:40, height:4, borderRadius:2, background:'var(--line-2)'}}/>
+          </div>
+          {/* Colored header band */}
+          <div style={{
+            background: zd.color, color: zd.ink,
+            padding: '12px 16px 14px', position:'relative', flexShrink: 0,
+          }}>
+            <div style={{fontFamily:'JetBrains Mono, monospace', fontSize:9.5, letterSpacing:'0.14em', opacity:0.75, textTransform:'uppercase'}}>
+              {zd.name} · est. {detail.established}
+            </div>
+            <div style={{fontSize: 20, fontWeight: 800, letterSpacing:'-0.02em', marginTop:2, lineHeight:1.15, paddingRight: 36}}>
+              {school.name}
+            </div>
+            <div style={{display:'flex', gap:6, marginTop: 6, flexWrap:'wrap'}}>
+              <span style={{background:'rgba(0,0,0,0.12)', padding:'2px 8px', borderRadius:999, fontSize:10.5, fontWeight:700, letterSpacing:'0.04em', fontFamily:'JetBrains Mono, monospace', whiteSpace:'nowrap'}}>{school.type}</span>
+              <span style={{background:'rgba(0,0,0,0.12)', padding:'2px 8px', borderRadius:999, fontSize:10.5, fontWeight:700, letterSpacing:'0.04em', fontFamily:'JetBrains Mono, monospace', whiteSpace:'nowrap'}}>{detail.classes} klasser</span>
+            </div>
+            <button onClick={onClose} style={{
+              position:'absolute', top:12, right:12,
+              width:32, height:32, borderRadius:999,
+              background:'rgba(0,0,0,0.12)', border:0, color:'inherit',
+              cursor:'pointer', fontSize:20, fontWeight:700, lineHeight:1,
+            }}>×</button>
+          </div>
+          {/* Scrollable body */}
+          <div style={{flex:1, minHeight:0, overflowY:'auto', padding:'14px 16px 20px', display:'flex', flexDirection:'column', gap: 12}}>
+            <div>
+              <div style={panelStyles.kicker}>Elever</div>
+              <div style={{display:'flex', alignItems:'baseline', gap:10, flexWrap:'wrap'}}>
+                <div style={{fontSize: 36, fontWeight:800, lineHeight:1, letterSpacing:'-0.03em', color:'var(--ink)', fontVariantNumeric:'tabular-nums'}}>
+                  {school.students}
+                </div>
+                <div style={{fontSize:12, fontWeight:700, color: trendPctM>=0?'#0E7C86':'#B54B3C', whiteSpace:'nowrap'}}>
+                  {trendPctM>=0?'▲':'▼'} {Math.abs(trendPctM)}% sedan 20/21
+                </div>
+              </div>
+            </div>
+            <div style={{display:'flex', alignItems:'center', gap: 12, padding:'10px 12px', background:'#FBF9F3', borderRadius:8, border:'1px solid var(--line)'}}>
+              <MiniDonut segs={[
+                {value: detail.grades.fk3, color: zd.color},
+                {value: detail.grades.y46, color: '#364A5A'},
+                {value: detail.grades.y79, color: '#F4BFAE'},
+              ]}/>
+              <div style={{flex:1}}>
+                <div style={{fontFamily:'JetBrains Mono, monospace', fontSize:9.5, letterSpacing:'0.1em', color:'var(--mute)', textTransform:'uppercase', marginBottom:4}}>Årskursfördelning</div>
+                <div style={{fontSize:12, display:'flex', flexDirection:'column', gap:3, color:'var(--slate)'}}>
+                  <div style={{display:'flex', alignItems:'center', gap:6}}><span style={{width:8,height:8,borderRadius:2,background:zd.color}}/><span style={{flex:1}}>F–3</span><span style={{fontVariantNumeric:'tabular-nums', fontWeight:600}}>{detail.grades.fk3}%</span></div>
+                  <div style={{display:'flex', alignItems:'center', gap:6}}><span style={{width:8,height:8,borderRadius:2,background:'#364A5A'}}/><span style={{flex:1}}>4–6</span><span style={{fontVariantNumeric:'tabular-nums', fontWeight:600}}>{detail.grades.y46}%</span></div>
+                  <div style={{display:'flex', alignItems:'center', gap:6}}><span style={{width:8,height:8,borderRadius:2,background:'#F4BFAE'}}/><span style={{flex:1}}>7–9</span><span style={{fontVariantNumeric:'tabular-nums', fontWeight:600}}>{detail.grades.y79}%</span></div>
+                </div>
+              </div>
+            </div>
+            <MobileKPIs detail={detail}/>
+            <button onClick={onClose} style={{
+              marginTop: 6, padding:'12px 16px', border:0, borderRadius: 8,
+              background:'var(--ink)', color:'#FBF9F3', fontSize: 14, fontWeight:700,
+              fontFamily:'inherit', cursor:'pointer', letterSpacing:'-0.01em',
+            }}>Stäng</button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   // Responsive: clamp to container so card always fits
   const CARD_W = Math.min(340, Math.max(280, anchor.containerW - 32));
   const CARD_H = Math.min(560, Math.max(380, anchor.containerH - 24));
